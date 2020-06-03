@@ -1,0 +1,16 @@
+*.xlsx
+*.xls
+*.csv
+
+*.dta
+*.log
+
+*.Rproj
+*.RDS
+*.Rdata
+*.html
+*.Rprofvis
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
