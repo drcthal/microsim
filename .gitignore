@@ -1,6 +1,11 @@
 *.xlsx
 *.xls
 *.csv
+*.rtf
+*.dat
+*.txt
+
+*.xpt
 
 *.dta
 *.log
