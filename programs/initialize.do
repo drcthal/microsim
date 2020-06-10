@@ -23,9 +23,10 @@ keep perid hhid met2013 male age raceeth educ hhincome occ ind perwt
 
 // combine none and unemployed
 replace ind = 0 if ind==9920
+replace occ = 0 if occ==9920
 replace hhincome = . if hhincome<0 | hhincome==9999999
 
-add_comorb
+add_comorb, check_ev
 create_inds
 
 /* Assign people to industries now
