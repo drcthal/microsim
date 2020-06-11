@@ -1,5 +1,8 @@
 program define create_inds
-	qui {
+	syntax , [debug]
+	
+	local vol = cond(!mi("`debug'"),"noi","qui")
+	`vol' {
 		frame copy person industry, replace
 		
 		frame industry {
@@ -42,6 +45,7 @@ program define create_inds
 				bys met2013 ind: egen check = total(employees)
 				count if check<n
 				local needmore = r(N)
+				drop temp
 			}
 			
 			sort met2013 ind

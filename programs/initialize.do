@@ -7,7 +7,10 @@ frame create person
 frame change person
 
 use "$derived\acs_2018_clean.dta", clear
+// No clue how to handle non-metro
 drop if met2013==0
+// Boston, Baltimore, Pittsburgh for now
+keep if inlist(met2013, 14460, 12580, 38300)
 
 gen perid = _n
 rename serial hhid
@@ -28,13 +31,71 @@ replace hhincome = . if hhincome<0 | hhincome==9999999
 
 add_comorb, check_ev
 create_inds
+define_disease_progression
 
-/* Assign people to industries now
-	put them in a random order within met/ind, then fill out the workplaces 1 by 1
+// Placeholder
+gen base_tau_w = 1/3 * (ind!=0 | (age>=5 & age<=18 & ind==0))
+gen base_tau_c = 2/3 - base_tau_w
+gen base_tau_h = 1 - base_tau_c - base_tau_w
+
+// Average number of contacts if they spent 24 hours somewhere
+gen N_w = 50
+gen N_c = 50
+
+gen tau_w = base_tau_w
+gen tau_c = base_tau_c
+gen tau_h = base_tau_h
+
+// Seed infections
+// Should be weighted towards more recent
+gen day_infected = runiformint(-10,0) if runiform()<=0.01
+gen infection_source = "i" if !mi(day_infected)
+gen symptomatic = 0
+gen infectious = 0
+gen recovered = 0
+update_disease, day(0)
+update_taus, day(0)
+
+local day = 0
+
+count if !mi(day_infected) & !recovered
+local active = r(N)
+while `active' > 0  & `day' < 100 {
+	local ++day
+	di `day'
+	// For each day, we take people's current status, have them interact, then at the end of the day there are new infections, we progress disease, and we change taus
+	draw_contacts, day(`day')
+	update_disease, day(`day')
+	update_taus, day(`day')
 	
-	figure out how to deal with kids - if not working, assign to grade based on age, then create schools?
-	e.g. if we treat "grades" like industries we can use the same logic as create_inds
-	issues are class sizes, and also the fact that there would be no teachers.
-	
-	could take the elem/secondary school industries and blow those up?
-*/
+	count if !mi(day_infected) & !recovered
+	local active = r(N)
+}
+
+// Postprocessing - we can recreate daily infections by looking at day_infected and the days_to vars
+frame copy person postprocess, replace
+frame postprocess {
+	local day 100
+	keep met2013 perid perwt day_infected infection_source days_to_symptomatic days_to_infectious days_to_recovered
+	expand `=`day'+1'
+	bys perid: gen day = _n-1
+	gen infected = day>=day_infected & day < (day_infected + days_to_recovered)
+	gen symptomatic = day >= (day_infected + days_to_symptomatic) & day < (day_infected + days_to_recovered)
+	gen infectious = day >= (day_infected + days_to_infectious) & day < (day_infected + days_to_recovered)
+	gen recovered = day >= (day_infected + days_to_recovered)
+
+	gcollapse (rawsum) N=perwt (sum) infected symptomatic infectious recovered [aw=perwt], by(met2013 day)
+	foreach x in infected symptomatic infectious recovered {
+		gen `x'_rate = `x' / N
+		bys met2013 (day): gen cuml_`x' = sum(`x')
+		gen cuml_`x'_rate = cuml_`x' / N
+	}
+
+	local lines
+	foreach x in infected symptomatic infectious recovered {
+		local lines `lines' (line `x'_rate day)
+	}
+
+	tw `lines', by(met2013) scheme(cb) name(daily, replace)
+}
+
