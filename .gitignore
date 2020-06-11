@@ -4,11 +4,13 @@
 *.rtf
 *.dat
 *.txt
+*.docx
 
 *.xpt
 
 *.dta
 *.log
+*.tmp
 
 *.Rproj
 *.RDS

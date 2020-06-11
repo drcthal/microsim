@@ -3,9 +3,9 @@ program define create_inds
 	
 	local vol = cond(!mi("`debug'"),"noi","qui")
 	`vol' {
-		frame copy person industry, replace
+		frame copy person work, replace
 		
-		frame industry {
+		frame work {
 			drop if ind==0
 
 			gen n = 1
@@ -91,7 +91,7 @@ program define create_inds
 			collapse (sum) n_stu, by(met2013)
 		}
 		
-		frame copy industry `schs', replace
+		frame copy work `schs', replace
 		
 		// Apportion students in fixed ratio to staff across all elementary/secondary schools
 		frame `schs' {
@@ -117,7 +117,7 @@ program define create_inds
 			assert students!=0
 		}
 		
-		frame industry {
+		frame work {
 			frlink 1:1 met2013 indid, frame(`schs')
 			frget students = students, from(`schs')
 			replace students = 0 if ind!=7860

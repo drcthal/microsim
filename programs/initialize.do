@@ -32,6 +32,7 @@ replace hhincome = . if hhincome<0 | hhincome==9999999
 add_comorb, check_ev
 create_inds
 define_disease_progression
+link_frames
 
 // Placeholder
 gen base_tau_w = 1/3 * (ind!=0 | (age>=5 & age<=18 & ind==0))
@@ -60,7 +61,7 @@ local day = 0
 
 count if !mi(day_infected) & !recovered
 local active = r(N)
-while `active' > 0  & `day' < 100 {
+while `active' > 0  & `day' < 1000 {
 	local ++day
 	di `day'
 	// For each day, we take people's current status, have them interact, then at the end of the day there are new infections, we progress disease, and we change taus
@@ -77,8 +78,10 @@ frame copy person postprocess, replace
 frame postprocess {
 	local day 100
 	keep met2013 perid perwt day_infected infection_source days_to_symptomatic days_to_infectious days_to_recovered
+	gcollapse (sum) perwt, by(met2013 day_infected infection_source days_to_symptomatic days_to_infectious days_to_recovered)
+	gen id = _n
 	expand `=`day'+1'
-	bys perid: gen day = _n-1
+	bys id: gen day = _n-1
 	gen infected = day>=day_infected & day < (day_infected + days_to_recovered)
 	gen symptomatic = day >= (day_infected + days_to_symptomatic) & day < (day_infected + days_to_recovered)
 	gen infectious = day >= (day_infected + days_to_infectious) & day < (day_infected + days_to_recovered)
@@ -97,5 +100,18 @@ frame postprocess {
 	}
 
 	tw `lines', by(met2013) scheme(cb) name(daily, replace)
+}
+
+//daily new infections
+frame copy person postprocess2, replace
+frame postprocess2 {
+	bys met2013: gegen N = total(perwt)
+	gcollapse (sum) perwt, by(met2013 day_infected N)
+	
+	*tw bar perwt day_infected, by(met2013)
+	
+	gen inf_per_1000 = 1000*perwt/N
+	tw bar inf_per_1000 day_infected, by(met2013)
+	
 }
 

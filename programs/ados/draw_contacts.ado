@@ -34,7 +34,7 @@ program define draw_contacts
 			e.g. it's N_c if the MSA is going as usual, but if the MSA is 50% locked down it's lower?
 		*/
 		
-		frame copy person `community'
+		frame put met2013 infectious perwt tau_c tau_w , into(`community')
 		frame `community' {
 			// Each person's community contacts will be pulled from their MSA
 			// So calculate the probability that a person you meet during community-time is infected
@@ -64,7 +64,7 @@ program define draw_contacts
 										(1 - `cross_msa_weight') * ((total_community_infectious - community_only_infectious) / (total_community_weight - community_only_weight))
 		}
 		
-		frame copy person `work' 
+		frame put met2013 indid infectious perwt tau_w, into(`work' )
 		frame `work' {
 			// workplace contacts pulled from your workplace, and from community for community-facing jobs?
 			gen work_weight = tau_w * perwt
@@ -78,11 +78,30 @@ program define draw_contacts
 									(1 - `relative_work_weight') * community_only_infectious_chance
 		}
 		
-		frame copy person `household'
+		frame put hhid infectious, into(`household')
 		frame `household' {
 			// No weighting etc, you just come into contact with all HH members, so we only care about the # infected in the house
 			// This is wrong for people who are infected (includes self) but we don't care, they're already sick
+			// only care about positives
+			keep if infectious
 			gcollapse (sum) household_infectious = infectious, by(hhid)
+		}
+		
+		// Drag values over to the permament cwh frames
+		local community_link met2013
+		local work_link met2013 indid
+		local household_link hhid
+		foreach x in community work household {
+			frame `x' {
+				frlink 1:1 ``x'_link', frame(``x'')
+				if "`x'"=="household" {
+					frget `x'_infectious_`day' = `x'_infectious, from(``x'')
+					replace `x'_infectious_`day' = 0 if mi(`x'_infectious_`day')
+				}
+				else {
+					frget `x'_infectious_chance_`day' = `x'_infectious_chance, from(``x'')
+				}
+			}
 		}
 		
 		// In terms of optimization, what's better for frames? e.g. do I do everything in a tempframe and then relink each time?
@@ -94,17 +113,16 @@ program define draw_contacts
 			tempvar community_infectious_chance community_contacts community_infectious ///
 					work_infectious_chance work_contacts work_infectious household_infectious /// pr_infected
 					infected_c infected_w infected_h
-			frlink m:1 met2013, frame(`community')
-			frlink m:1 met2013 indid, frame(`work')
-			frlink m:1 hhid, frame(`household')
-			frget `community_infectious_chance' = community_infectious_chance, from(`community')
-			frget `work_infectious_chance' = work_infectious_chance, from(`work')
 			
 			gen `community_contacts' = rpoisson(tau_c * N_c)
+			frget `community_infectious_chance' = community_infectious_chance_`day', from(community)
 			gen `community_infectious' = cond(`community_contacts' > 0 & !mi(`community_contacts'), rbinomial(`community_contacts', `community_infectious_chance'), 0)
+			
 			gen `work_contacts' = rpoisson(tau_w * N_w)
+			frget `work_infectious_chance' = work_infectious_chance_`day', from(work)
 			gen `work_infectious' = cond(`work_contacts' > 0 & !mi(`work_contacts'), rbinomial(`work_contacts', `work_infectious_chance'), 0)
-			frget `household_infectious' = household_infectious, from(`household')
+			
+			frget `household_infectious' = household_infectious_`day', from(household)
 			
 			// Do we care about tracing source of infection?
 			// e.g. gen infected_cwh = rbinomial(`cwh_infectious',`c_spread')>0, gen replace day_infected = infected_c|w|h ==1
