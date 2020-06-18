@@ -84,7 +84,14 @@ program define draw_contacts
 			// This is wrong for people who are infected (includes self) but we don't care, they're already sick
 			// only care about positives
 			keep if infectious
-			gcollapse (sum) household_infectious = infectious, by(hhid)
+			if _N==0 {
+				// can't collapse but need to frget, so create dummy data
+				drop _all
+			    set obs 1
+				gen hhid = -1
+				gen household_infectious = 0
+			}
+			else gcollapse (sum) household_infectious = infectious, by(hhid)
 		}
 		
 		// Drag values over to the permament cwh frames

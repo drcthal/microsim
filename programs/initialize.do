@@ -54,6 +54,7 @@ gen infection_source = "i" if !mi(day_infected)
 gen symptomatic = 0
 gen infectious = 0
 gen recovered = 0
+gen dead = 0
 update_disease, day(0)
 update_taus, day(0)
 
@@ -73,12 +74,14 @@ while `active' > 0  & `day' < 1000 {
 	local active = r(N)
 }
 
+di `day'
+
 // Postprocessing - we can recreate daily infections by looking at day_infected and the days_to vars
 frame copy person postprocess, replace
 frame postprocess {
-	local day 100
 	keep met2013 perid perwt day_infected infection_source days_to_symptomatic days_to_infectious days_to_recovered
 	gcollapse (sum) perwt, by(met2013 day_infected infection_source days_to_symptomatic days_to_infectious days_to_recovered)
+	
 	gen id = _n
 	expand `=`day'+1'
 	bys id: gen day = _n-1
@@ -106,12 +109,35 @@ frame postprocess {
 frame copy person postprocess2, replace
 frame postprocess2 {
 	bys met2013: gegen N = total(perwt)
+	drop if mi(day_infected)
 	gcollapse (sum) perwt, by(met2013 day_infected N)
 	
 	*tw bar perwt day_infected, by(met2013)
 	
 	gen inf_per_1000 = 1000*perwt/N
 	tw bar inf_per_1000 day_infected, by(met2013)
-	
 }
 
+// Calculate effective R0 to compare to real world values
+// Not sure what the right way is - we don't actually track individuals, but that's also not available in real-world population studies
+// We know how many people are infectious in a given day and how many new people are infected. We also know how long people are infectious for. So combine those?
+frame copy person r0, replace
+frame r0 {
+    keep met2013 perid perwt day_infected days_to_symptomatic days_to_infectious days_to_recovered
+	keep if !mi(day_infected)
+	
+	gcollapse (sum) perwt, by(met2013 day_infected days_to_symptomatic days_to_infectious days_to_recovered)
+	
+	gen id = _n
+	expand `=`day'+1'
+	bys id: gen day = _n-1
+	gen infectious = day >= (day_infected + days_to_infectious) & day < (day_infected + days_to_recovered)
+	gen newly_infected = day==day_infected
+	gen days_infectious = days_to_recovered - days_to_infectious
+	
+	gcollapse (sum) infectious newly_infected (mean) days_infectious [fw=perwt], by(met2013 day)
+	
+	gen r0 = days_infectious * newly_infected / infectious
+	bys met2013: summ r0
+	tw line r0 day, by(met2013) scheme(cb) name(daily, replace)
+}

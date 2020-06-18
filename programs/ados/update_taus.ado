@@ -14,6 +14,10 @@ program define update_taus
 		replace tau_w = base_tau_w if recovered
 		replace tau_c = base_tau_c if recovered
 		
+		// The dead will have their tau_c/w set to 0, since in this model that is equivalent (no interaction outside of the house, and inside we only track the infections, which they necessarily aren't)
+		replace tau_w = 0 if dead
+		replace tau_c = 0 if dead
+		
 		/*
 			Could also update society things, like society shutting down  depending on infection rates, 
 			or industry specific shutdowns or w/e
