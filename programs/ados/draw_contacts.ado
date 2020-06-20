@@ -1,5 +1,5 @@
 program define draw_contacts
-	syntax, day(int) [c_spread(real -1) w_spread(real -1) h_spread(real -1) cross_msa_weight(real 0.99999) relative_work_weight(real 0.99) debug]
+	syntax, day(int) [c_spread(real -1) w_spread(real -1) h_spread(real -1) cross_msa_weight(real 0.9999) debug]
 	
 	local vol = cond(!mi("`debug'"),"noi","qui")
 	`vol' {
@@ -9,9 +9,9 @@ program define draw_contacts
 			// then .85 = (1-p)^7
 			local h_spread = 1 - exp(ln(.85)/7)
 		}
-		// Assume community and work chance are 1/2 of that if not specified
-		if `c_spread' == -1 local c_spread = (1 - exp(ln(.85)/7)) / 2
-		if `w_spread' == -1 local w_spread = (1 - exp(ln(.85)/7)) / 2
+		// Assume community and work chance are identical
+		if `c_spread' == -1 local c_spread = (1 - exp(ln(.85)/7))
+		if `w_spread' == -1 local w_spread = (1 - exp(ln(.85)/7))
 		
 		tempname community work household
 		
@@ -34,48 +34,37 @@ program define draw_contacts
 			e.g. it's N_c if the MSA is going as usual, but if the MSA is 50% locked down it's lower?
 		*/
 		
-		frame put met2013 infectious perwt tau_c tau_w , into(`community')
+		frame put met2013 infectious perwt N_w_c N_c tau_c tau_w  base_tau_c base_tau_w, into(`community')
 		frame `community' {
 			// Each person's community contacts will be pulled from their MSA
 			// So calculate the probability that a person you meet during community-time is infected
-			// This is weighted by the time each person spends in the community, plus the time spent at work for people in jobs like retail etc
-			// For now we assume all jobs are community-facing
+			// Each person is weighted by their number of contacts in the community during community time and work time
 			
-			// also calculate a version that uses community-only time. 
-			// This will be used for both cross-MSA spreading (i.e. assume people only travel during their own time?)
-			// And also for work interactions (e.g. at work I interact with my coworkers plus customers)
-			// Maybe that's dumb and it should just all be non-home time (e.g. at work I interact with customers plus deliveries etc; or people travel for work)	
-			
-			gen community_weight = (tau_c + tau_w) * perwt
-			gen community_only_weight = tau_c * perwt
+			gen community_weight = ((N_c * tau_c / base_tau_c) + cond(base_tau_w!=0, N_w_c * tau_w / base_tau_w, 0)) * perwt
 			gen community_infectious = infectious * community_weight
-			gen community_only_infectious = infectious * community_only_weight
 			// calculate the MSA-wide infection rate
-			gcollapse (sum) community_infectious community_weight community_only_infectious community_only_weight, by(met2013)
-			gen community_only_infectious_chance = community_only_infectious / community_only_weight 
+			gcollapse (sum) community_infectious community_weight, by(met2013)
 			
 			// For infection during community phase, include cross-msa spread by taking the average of your MSA plus all others, weighted very heavily to yours
 			// These include the data from your own MSA, so subtract that out later
 			// TODO: could replace with distance matrix
-			egen total_community_infectious = total(community_only_infectious)
-			egen total_community_weight = total(community_only_weight)
+			egen total_community_infectious = total(community_infectious)
+			egen total_community_weight = total(community_weight)
 			
 			gen community_infectious_chance = `cross_msa_weight' * (community_infectious / community_weight) + ///
-										(1 - `cross_msa_weight') * ((total_community_infectious - community_only_infectious) / (total_community_weight - community_only_weight))
+										(1 - `cross_msa_weight') * ((total_community_infectious - community_infectious) / (total_community_weight - community_weight))
 		}
 		
-		frame put met2013 indid infectious perwt tau_w, into(`work' )
+		frame put met2013 indid infectious perwt N_w_w tau_w base_tau_w, into(`work' )
 		frame `work' {
-			// workplace contacts pulled from your workplace, and from community for community-facing jobs?
-			gen work_weight = tau_w * perwt
+			// workplace contacts pulled from your workplace, with indivs weighted by how many coworker contacts they have
+			// NB: given workplace sizes this may be nonsense, e.g. if I have a workplace of size 10 yet a number of work contacts of 12.
+			// But the relative magnitudes are what matter
+			gen work_weight = (N_w_w * tau_w / base_tau_w) * perwt
 			gen work_infectious = infectious * work_weight
 			gcollapse (sum) work_weight work_infectious, by(met2013 indid)
-			frlink m:1 met2013, frame(`community')
-			frget community_only_infectious_chance, from(`community')
 			
-			// Assume contacts with workplace are much more likely, so upweight that
-			gen work_infectious_chance = `relative_work_weight' * (work_infectious / work_weight) + ///
-									(1 - `relative_work_weight') * community_only_infectious_chance
+			gen work_infectious_chance = (work_infectious / work_weight) 
 		}
 		
 		frame put hhid infectious, into(`household')
@@ -111,21 +100,17 @@ program define draw_contacts
 			}
 		}
 		
-		// In terms of optimization, what's better for frames? e.g. do I do everything in a tempframe and then relink each time?
-		// Or is it faster to have a permanent link to the industry file, and the update tempframe links to the ind file
-		// then I'm keeping stable the link to the person file, and only relinking the industries, which has a way lower N, each time?
-		// Ditto MSA connections. So basically keep static many:few link, and reupdate few:few links? Could also save a history that way, e.g. the permanent few keeps the record of daily chances
 		// Now draw contacts
 		frame person {
 			tempvar community_infectious_chance community_contacts community_infectious ///
 					work_infectious_chance work_contacts work_infectious household_infectious /// pr_infected
 					infected_c infected_w infected_h
 			
-			gen `community_contacts' = rpoisson(tau_c * N_c)
+			gen `community_contacts' = rpoisson(N_c * tau_c / base_tau_c + cond(base_tau_w!=0, N_w_c * tau_w / base_tau_w, 0))
 			frget `community_infectious_chance' = community_infectious_chance_`day', from(community)
 			gen `community_infectious' = cond(`community_contacts' > 0 & !mi(`community_contacts'), rbinomial(`community_contacts', `community_infectious_chance'), 0)
 			
-			gen `work_contacts' = rpoisson(tau_w * N_w)
+			gen `work_contacts' = rpoisson(N_w_w * tau_w / base_tau_w)
 			frget `work_infectious_chance' = work_infectious_chance_`day', from(work)
 			gen `work_infectious' = cond(`work_contacts' > 0 & !mi(`work_contacts'), rbinomial(`work_contacts', `work_infectious_chance'), 0)
 			

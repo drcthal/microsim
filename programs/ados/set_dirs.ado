@@ -13,6 +13,13 @@ program define set_dirs
 		global progs "$root\programs"
 		global output "$root\output"
 	}
+	else if "`c(username)'" == "gamcc" {
+		global root "C:\Users\gamcc\Dropbox\Research\project_covid19_analysis"
+		global raw "$root\data\raw"
+		global derived "$root\data\derived"
+		global progs "$root\scripts"
+		global output "$root\output"
+	}
 	else {
 		di as error "Set your location in set_dirs.ado"
 	}
