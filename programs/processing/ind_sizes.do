@@ -87,13 +87,34 @@ fillin area_fips CensusCode
 merge m:1 CensusCode using `avg', assert(3) nogen
 replace ind_size = avg_ind_size if mi(ind_size)
 
+gen long met2013 = 10*real(substr(area_fips,2,.))
+
+// Append on ind sizes based on the average for the fips codes masquerading as MSAs that we'll use in the sims
+preserve
+	use "$raw\all_statefip.dta", clear
+	gen one = 1
+	tempfile state
+	save `state'
+	
+	use `avg', clear
+	gen one = 1
+	joinby one using `state'
+	drop one
+	
+	rename statefip met2013
+	rename avg_ind_size ind_size
+	tempfile statelvl
+	save `statelvl'
+restore
+append using `statelvl'
+
 // Railroad workers, for some reason, are always missing
 count if mi(ind_size)
 assert (CensusCode=="6080") == (mi(ind_size))
 // Assign RR the mean from the other transport codes
 preserve
 	keep if inrange(real(CensusCode),6070,6390)
-	collapse (sum) annual_avg_estabs_count annual_avg_emplvl, by(area_fips)
+	collapse (sum) annual_avg_estabs_count annual_avg_emplvl, by(met2013)
 	gen avg_transp_size = annual_avg_emplvl / annual_avg_estabs_count
 	
 	qui: summ annual_avg_estabs_count 
@@ -101,18 +122,15 @@ preserve
 	qui: summ annual_avg_emplvl 
 	local avg_avg_transp_size = r(sum) / `tot_estabs'
 	
-	keep area_fips avg_transp_size 
+	keep met2013 avg_transp_size 
 	
 	tempfile transp
 	save `transp'
 restore
-merge m:1 area_fips using `transp', assert(3) nogen
+merge m:1 met2013 using `transp', assert(3) nogen
 replace ind_size = avg_transp_size if CensusCode=="6080"
 replace ind_size = `avg_avg_transp_size' if CensusCode=="6080" & mi(ind_size)
 
-drop annual_avg_estabs_count annual_avg_emplvl avg_ind_size avg_transp_size
-
-gen long met2013 = 10*real(substr(area_fips,2,.))
 destring CensusCode, gen(ind)
 
 keep met2013 ind ind_size
