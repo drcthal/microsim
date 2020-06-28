@@ -1,0 +1,89 @@
+* Graph scheme with Mathematica colors
+
+*!  version 1.0.0   26jan2018
+
+sequence 1
+label "Mathematica"
+#include s2color // Start with stata default color scheme
+
+// Based on http://mathnet.mathematica.net/sites/infosite/comm/Document%20Library/Mathematica_BrandGuide_v4r2.pdf
+
+color background							white
+color plotregion							white
+color plotregion_line						white
+color graphregion							white
+
+margin plotregion							zero
+margin twoway								zero
+margin boxgraph								zero
+
+// Default color order
+// Per guidelines, use secondary colors plus their tints; don't use the primary
+color p										gs6
+color p1                                    cb_green
+color p2                                    cb_orange
+color p3                                    cb_purple
+color p4                                    cb_green_light
+color p5                                    cb_orange_light
+color p6                                    cb_purple_light
+color p7                                    cb_green_medium
+color p8                                    cb_orange_medium
+color p9                                    cb_purple_medium
+
+// Disable axis grid by default (not specified in guidelines)
+yesno draw_major_vgrid						no
+axisstyle bar_scale_horiz					horizontal_nogrid
+axisstyle bar_scale_vert					vertical_nogrid
+axisstyle dot_scale_horiz					horizontal_nogrid
+axisstyle dot_scale_vert					vertical_nogrid
+axisstyle box_scale_horiz					horizontal_nogrid
+axisstyle box_scale_vert					vertical_nogrid
+
+// If grid is drawn, use the light gray, per guildlines
+color grid									mpr_grey25
+color major_grid							mpr_grey25
+color minor_grid							mpr_grey25
+
+// remove legend outline
+color legend								white
+color legend_line							white
+
+color heading								black
+color subheading							black
+color axis_title							black
+color small_body							black // Notes
+
+gsize legend_key_xsize						5
+gsize legend_key_ysize         				5
+
+gsize note									vsmall
+gsize small_body							vsmall
+
+areastyle combinegraph						none
+areastyle combinegraph_inner				none
+areastyle combinegraph_plotregion			none
+areastyle combinegraph_iplotregion			none
+
+color textbox       						none
+color bylabel_outline    					none
+
+color sunflower								mpr_light_green
+color sunflowerlb							mpr_yellow
+color sunflowerlf							mpr_teal
+color sunflowerdb							mpr_red
+color sunflowerdf							mpr_grey
+
+// This is bloody horrible - seems like there's a good reason to leave it as-is rather than blindly imposing our colors
+// color contour_begin							mpr_light_green
+// color contour_end							mpr_red
+
+// What do we want to do wrt intensity?
+// by default state uses 80% intensity for tw, which means it's not actually the real MPR green if we're doing tw
+intensity p									inten90
+intensity pie								inten90
+// need <100% for graph box though, since otherwise you can;t see the line delineating median
+intensity box								inten50
+
+
+
+
