@@ -50,6 +50,14 @@ evaluate_sim, day(`day') daily_inf
 graph export "$output\simulations\daily_inf.emf", replace
 evaluate_sim, day(`day') source
 graph export "$output\simulations\source.emf", replace
-local day 61
-evaluate_sim, day(`day') compare_r0
+evaluate_sim, day(`day') compare_r0 smooth
 graph export "$output\simulations\compare_r0.emf", replace
+
+local big inlist(statefip, 6, 9, 17, 22, 25, 34, 36, 53)
+evaluate_sim if `big', day(`day') daily_inf
+graph export "$output\simulations\daily_inf_big.emf", replace
+evaluate_sim if `big', day(`day') source
+graph export "$output\simulations\source_big.emf", replace
+evaluate_sim if `big', day(`day') compare_r0 smooth
+graph export "$output\simulations\compare_r0_big.emf", replace
+
