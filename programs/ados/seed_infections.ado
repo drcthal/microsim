@@ -61,7 +61,7 @@ program define seed_infections
 			gen inf_rand = runiform()
 			
 			forval d = `=td(1mar2020)'/`=td(31mar2020)' {
-			    replace day_infected = `d' - td(1apr2020) if inf_rand <= cuml_pr_inf_`d' & mi(day_infected)
+			    replace day_infected = `d' - td(31mar2020) if inf_rand <= cuml_pr_inf_`d' & mi(day_infected)
 			}
 			drop inf_rand cuml_pr_inf_*
 		}

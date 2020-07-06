@@ -1,17 +1,17 @@
 program define draw_contacts
-	syntax, day(int) [c_spread(real -1) w_spread(real -1) h_spread(real -1) cross_msa_weight(real 0.9999) debug]
+	syntax, day(int) [c_spread(real -1) w_spread(real -1) h_spread(real -1) ///
+					c_spread_mod(real 1) w_spread_mod(real 1) h_spread_mod(real 1) ///
+					cross_msa_weight(real 0.9999) debug]
 	
 	local vol = cond(!mi("`debug'"),"noi","qui")
 	`vol' {
-		if `h_spread' == -1 {
-			// go from chris's 15% number
-			// if p = daily chance of catching it, and 15% = cumulative chance over 7 days,
-			// then .85 = (1-p)^7
-			local h_spread = 1 - exp(ln(.85)/7)
+		// If not specified, back spread rate out from Chris's 15% number
+		// So 15% = cuml over 7 days, so .85 = (1-p)^7
+		foreach x in c w h {
+			if ``x'_spread'==-1 local `x'_spread = (1 - exp(ln(.85)/7))
+			// alternative way of specifying: use that assumption and apply a modifier
+			local `x'_spread = ``x'_spread' * ``x'_spread_mod'
 		}
-		// Assume community and work chance are identical
-		if `c_spread' == -1 local c_spread = (1 - exp(ln(.85)/7))
-		if `w_spread' == -1 local w_spread = (1 - exp(ln(.85)/7))
 		
 		tempname community work household
 		

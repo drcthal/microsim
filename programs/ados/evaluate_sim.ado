@@ -4,14 +4,22 @@ program define evaluate_sim
 	marksample touse
 	
 	if mi("`level'") local level statefip
-	if !inlist("`level'", "statefip","met2013") {
-	    di as error "Can only evaluate at MSA or state level
+	if !inlist("`level'", "national", "statefip", "met2013") {
+	    di as error "Can only evaluate at national, MSA or state level
 		exit 198"
 	}
-	local lttl = cond("`level'"=="statefip", "State", "MSA")
+	if "`level'"=="national" local lttl "Nationwide"
+	if "`level'"=="statefip" local lttl "by State"
+	if "`level'"=="met2013" local lttl "by MSA"
 
 	local vol = cond(!mi("`debug'"),"noi","qui")
 	`vol' {
+		if "`level'"=="national"{
+		  gen national = 1
+		  label define natllbl 1 "Nationwide", replace
+		  label values national natllbl
+		} 
+		
 		if !mi("`daily_inf'") {
 		    tempname dinf
 			frame put `touse' `level' perwt day_infected, into(`dinf')
@@ -26,7 +34,7 @@ program define evaluate_sim
 				replace day_infected = day_infected + td(31mar2020)
 				format day_infected %td
 				tw bar inf_per_1000 day_infected, ///
-					by(`level', title("Daily New Infections by `lttl'")) ///
+					by(`level', title("Daily New Infections `lttl'")) ///
 					xtitle("Day") ///
 					ytitle("Infections per 1,000") ///
 					scheme(cb)
@@ -38,7 +46,7 @@ program define evaluate_sim
 		    tempname src
 			frame put `touse' `level' perid perwt day_infected infection_source, into(`src')
 			frame `src' {
-			    keep if `touse'
+				keep if `touse'
 				keep if day_infected > 0 & !mi(day_infected)
 
 				gen source = 1 if infection_source == "w"
@@ -60,8 +68,7 @@ program define evaluate_sim
 
 				replace day_infected = day_infected + td(31mar2020)
 				format day_infected %td
-
-				local level statefip
+				
 				tw (rbar bottom top day_infected if source==1) ///
 					(rbar bottom top day_infected if source==2) ///
 					(rbar bottom top day_infected if source==3) ///
@@ -97,7 +104,7 @@ program define evaluate_sim
 				
 				bys `level' (day): gen sim_r0_7avg = (sim_r0 + sim_r0[_n-1] + sim_r0[_n-2] + sim_r0[_n-3] + sim_r0[_n-4] + sim_r0[_n-5] + sim_r0[_n-6]) / 7
 				
-				merge 1:1 `level' day using "$derived\rt\actual_r0s.dta", keep(1 3) nogen
+				merge 1:m `level' day using "$derived\rt\actual_r0s.dta", keep(1 3) nogen
 				keep if day > 0
 				
 				replace day = day + td(31mar2020)
@@ -111,18 +118,22 @@ program define evaluate_sim
 				    local yv sim_r0
 					local yvl "Simulation R0, daily"
 				}
-				tw (rarea r0_lower_90 r0_upper_90 day, color(black%25)) ///
-					(rarea r0_lower_50 r0_upper_50 day, color(black%50)) ///
+				tw (rarea r0_lower_80 r0_upper_80 day, color(black%50)) ///
 					(line r0_actual day, color(black) lpattern(longdash)) ///
 					(line `yv' day, color(cb_orange)) ///
 					, ///
 					by(`level', title("Simulated vs actual R0 by Day and `lttl'")) ///
 					xtitle("Day") ///
 					ytitle("R0") ///
-					legend(order(4 "`yvl'" 3 "Real R0" 2 "50% CI" 1 "90% CI")) ///
+					legend(order(3 "`yvl'" 2 "Real R0" 1 "80% CI")) ///
 					scheme(cb)
 
 			}
+		}
+		
+		if "`level'"=="national" {
+		    drop national
+			label drop natllbl
 		}
 	}
 end

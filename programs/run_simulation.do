@@ -36,7 +36,7 @@ while `active' > 0  & `day' < 61 {
 	local ++day
 	di `day'
 	// For each day, we take people's current status, have them interact, then at the end of the day there are new infections, we progress disease, and we change taus
-	draw_contacts, day(`day') h_spread(0.05) c_spread(0.03) w_spread(0.03)
+	draw_contacts, day(`day') h_spread_mod(2) c_spread_mod(1) w_spread_mod(1)
 	update_disease, day(`day')
 	update_taus, day(`day')
 	
@@ -46,11 +46,11 @@ while `active' > 0  & `day' < 61 {
 
 di `day'
 
-evaluate_sim, day(`day') daily_inf
+evaluate_sim, day(`day') daily_inf level(national)
 graph export "$output\simulations\daily_inf.emf", replace
-evaluate_sim, day(`day') source
+evaluate_sim, day(`day') source level(national)
 graph export "$output\simulations\source.emf", replace
-evaluate_sim, day(`day') compare_r0 smooth
+evaluate_sim, day(`day') compare_r0 smooth level(national)
 graph export "$output\simulations\compare_r0.emf", replace
 
 local big inlist(statefip, 6, 9, 17, 22, 25, 34, 36, 53)
