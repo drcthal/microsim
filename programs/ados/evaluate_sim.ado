@@ -1,5 +1,5 @@
 program define evaluate_sim
-	syntax [if], day(int) [level(string) daily_inf source compare_r0 smooth debug]
+	syntax [if], day(int) [level(string) daily_inf source compare_r0 smooth save(string) debug]
 
 	marksample touse
 	
@@ -92,8 +92,8 @@ program define evaluate_sim
 				gcollapse (sum) perwt, by(`level' day_infected days_to_symptomatic days_to_infectious days_to_recovered)
 
 				gen id = _n
-				expand `=`day'+1'
-				bys id: gen day = _n-1
+				expand `day'
+				bys id: gen day = _n
 				gen infectious = day >= (day_infected + days_to_infectious) & day < (day_infected + days_to_recovered)
 				gen newly_infected = day==day_infected
 				gen days_infectious = days_to_recovered - days_to_infectious
@@ -127,6 +127,10 @@ program define evaluate_sim
 					ytitle("R0") ///
 					legend(order(3 "`yvl'" 2 "Real R0" 1 "80% CI")) ///
 					scheme(cb)
+					
+				if !mi("`save'") {
+					save "$output\simulations\\`save'.dta", replace
+				}
 
 			}
 		}
