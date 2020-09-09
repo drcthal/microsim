@@ -37,7 +37,7 @@ forval i = 1/10 {
 		local ++day
 		di `day'
 		// For each day, we take people's current status, have them interact, then at the end of the day there are new infections, we progress disease, and we change taus
-		draw_contacts, day(`day') h_spread_mod(2.25) c_spread_mod(0.9) w_spread_mod(0.9)
+		draw_contacts, day(`day') h_spread_mod(2.25) c_spread_mod(2.25) w_spread_mod(2.25)
 		update_disease, day(`day')
 		update_taus, day(`day')
 		

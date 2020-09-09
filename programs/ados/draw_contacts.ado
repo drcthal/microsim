@@ -1,7 +1,7 @@
 program define draw_contacts
 	syntax, day(int) [c_spread(real -1) w_spread(real -1) h_spread(real -1) ///
 					c_spread_mod(real 1) w_spread_mod(real 1) h_spread_mod(real 1) ///
-					cross_msa_weight(real 0.9999) debug]
+					cross_msa_weight(real 0.9999) mask_factor(real 0.33) debug]
 	
 	local vol = cond(!mi("`debug'"),"noi","qui")
 	`vol' {
@@ -97,17 +97,22 @@ program define draw_contacts
 				else {
 					frget `x'_infectious_chance_`day' = `x'_infectious_chance, from(``x'')
 				}
+				if "`x'"=="community" {
+					// TODO: completely arbitrary: assume for every 1pp change in infection rate, mask wearing goes up 10pp
+				    gen pct_masked_`day' = max(0,min(1, pct_masked + 10*(`x'_infectious_chance_`day' - `x'_infectious_chance_1)))
+				}
 			}
 		}
 		
 		// Now draw contacts
 		frame person {
-			tempvar community_infectious_chance community_contacts community_infectious ///
+			tempvar community_infectious_chance community_contacts community_infectious pct_masked is_masked ///
 					work_infectious_chance work_contacts work_infectious household_infectious /// pr_infected
-					infected_c infected_w infected_h
+					c_spread_rate w_spread_rate infected_c infected_w infected_h
 			
 			gen `community_contacts' = rpoisson(N_c * tau_c / base_tau_c + cond(base_tau_w!=0, N_w_c * tau_w / base_tau_w, 0))
 			frget `community_infectious_chance' = community_infectious_chance_`day', from(community)
+			frget `pct_masked' = pct_masked_`day', from(community)
 			gen `community_infectious' = cond(`community_contacts' > 0 & !mi(`community_contacts'), rbinomial(`community_contacts', `community_infectious_chance'), 0)
 			
 			gen `work_contacts' = rpoisson(N_w_w * tau_w / base_tau_w)
@@ -116,12 +121,19 @@ program define draw_contacts
 			
 			frget `household_infectious' = household_infectious_`day', from(household)
 			
+			// Determine if individual is masked
+			// TODO: this currently just checks am I masked, and says nothing about the other people.
+			gen `is_masked' = runiform() <= `pct_masked'
+			gen `c_spread_rate' = cond(`is_masked'==1,`c_spread' * `mask_factor',`c_spread')
+			gen `w_spread_rate' = cond(`is_masked'==1,`w_spread' * `mask_factor',`w_spread')
+			
 			// Do we care about tracing source of infection?
 			// e.g. gen infected_cwh = rbinomial(`cwh_infectious',`c_spread')>0, gen replace day_infected = infected_c|w|h ==1
 			*gen `pr_infected' = 1 - binomial(`community_infectious',0,`c_spread') * binomial(`work_infectious',0,`w_spread') * binomial(`household_infectious',0,`h_spread')
 			*assert !mi(`pr_infected')
-			gen `infected_c' = max(rbinomial(`community_infectious', `c_spread'),0) > 0 // rbinomial(0,x) gives missing rather than 0, thankfully max(.,0) is somehow 0
-			gen `infected_w' = max(rbinomial(`work_infectious', `w_spread'),0) > 0
+			gen `infected_c' = max(rbinomial(`community_infectious', `c_spread_rate'),0) > 0 // rbinomial(0,x) gives missing rather than 0, thankfully max(.,0) is somehow 0
+			gen `infected_w' = max(rbinomial(`work_infectious', `w_spread_rate'),0) > 0
+			// Assume no masks at home
 			gen `infected_h' = max(rbinomial(`household_infectious', `h_spread'),0) > 0
 			
 			replace day_infected = `day' if mi(day_infected) & (`infected_c' | `infected_w' | `infected_h')

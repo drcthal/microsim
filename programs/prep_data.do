@@ -35,6 +35,23 @@ add_contact_Ns
 add_taus
 seed_infections, prob
 
+// Save propensity to wear mask
+preserve
+	import delimited using "$raw\trends\data-G5kpu.csv", clear varn(1)
+	gen pct_masked = thatselected/100
+	rename x1 state
+	keep state pct_masked
+	tempfile mask
+	save `mask'
+restore
+preserve
+	decode statefip, gen(state)
+	merge m:1 state using `mask', assert(3) nogen
+	gcollapse (mean) pct_masked [aw=perwt], by(met2013)
+	compress
+	save "$derived\msa_masked.dta", replace
+restore
+
 keep perid hhid met2013 statefip male age raceeth educ hhincome perwt occ ind cardiac_risk diabetes_risk copd_risk cancer_kidney_risk essential pr_essential N_c N_w_c N_w_w base_tau_w base_tau_c base_tau_h tau_e tau_ne cuml_pr_inf_*
 order perid hhid met2013 statefip male age raceeth educ hhincome perwt occ ind cardiac_risk diabetes_risk copd_risk cancer_kidney_risk essential pr_essential N_c N_w_c N_w_w base_tau_w base_tau_c base_tau_h tau_e tau_ne cuml_pr_inf_*
 
